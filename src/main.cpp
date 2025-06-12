@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <iostream>
 #include <termios.h>
 #include <unistd.h>
@@ -29,7 +30,14 @@ int main()
     char c;
     while (std::cin >> c && c != 'q')
     {
-        
+        if (iscntrl(c))
+        {
+            std::printf("%d\n", c);
+        }
+        else
+        {
+            std::printf("%d %c\n", c, c);
+        }
     }
     return 0;
 }
