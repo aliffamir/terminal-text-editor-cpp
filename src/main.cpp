@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <cstdio>
 #include <iostream>
 #include <termios.h>
@@ -6,38 +7,57 @@
 
 struct termios original_termios;
 
+void die(const char *s)
+{
+    perror(s);
+    exit(1);
+}
+
 void disableRawMode()
 {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios) == -1)
+        die("tcsetattr");
 }
 void enableRawMode()
 {
 
-    tcgetattr(STDIN_FILENO, &original_termios);
+    if (tcgetattr(STDIN_FILENO, &original_termios) == -1)
+        die("tcgetattr");
+
     atexit(disableRawMode);
 
     struct termios raw = original_termios;
-    raw.c_lflag &= ~(ECHO | ICANON);
+    raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP | ICRNL | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 1;
 
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
+        die("tcsetattr");
 }
 
 int main()
 {
     enableRawMode();
 
-    std::cout << "hello world\n";
-    char c;
-    while (std::cin >> c && c != 'q')
+    while (1)
     {
+        char c = '\0';
+        if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN)
+            die("read");
+
         if (iscntrl(c))
         {
-            std::printf("%d\n", c);
+            std::printf("%d\r\n", c);
         }
         else
         {
-            std::printf("%d %c\n", c, c);
+            std::printf("%d ('%c')\r\n", c, c);
         }
+        if (c == 'q')
+            break;
     }
     return 0;
 }
