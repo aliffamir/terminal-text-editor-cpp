@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <errno.h>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
+#define KILO_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 struct editorConfig
@@ -39,7 +42,7 @@ void enableRawMode()
 
     atexit(disableRawMode);
 
-    struct termios raw = E.original_termios;
+    termios raw = E.original_termios;
     raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP | ICRNL | IXON);
     raw.c_oflag &= ~(OPOST);
     raw.c_cflag |= (CS8);
@@ -107,17 +110,37 @@ int getWindowSize(int& rows, int& cols)
         return 0;
     }
 }
+
 /* output */
 void editorDrawRows(std::string& buffer)
 {
     for (int y{0}; y < E.screenrows; ++y)
     {
-        // write(STDOUT_FILENO, "~", 1);
-        buffer.append(1, '~');
+        if (y == E.screenrows / 3)
+        {
+            std::string welcome = "Kilo editor -- version " + static_cast<std::string>(KILO_VERSION);
+            int welcomeLength = std::min(static_cast<int>(welcome.size()), E.screencols);
+            int padding = (E.screencols - welcomeLength) / 2;
+            if (padding)
+            {
+                buffer.append(1, '~');
+                --padding;
+            }
+            while (padding--)
+            {
+                buffer.append(1, ' ');
+            }
 
+            buffer.append(welcome.c_str(), welcomeLength);
+        }
+        else
+        {
+            buffer.append(1, '~');
+        }
+
+        buffer.append("\x1b[K", 3);
         if (y < E.screenrows - 1)
         {
-            // write(STDOUT_FILENO, "\r\n", 2);
             buffer.append("\r\n", 2);
         }
     }
@@ -129,7 +152,6 @@ void editorRefreshScreen()
 
     // hide cursor
     buffer.append("\x1b[?25l", 6);
-    buffer.append("\x1b[2J", 4);
     buffer.append("\x1b[H", 3);
 
     editorDrawRows(buffer);
