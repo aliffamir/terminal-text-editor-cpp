@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -107,27 +108,37 @@ int getWindowSize(int& rows, int& cols)
     }
 }
 /* output */
-void editorDrawRows()
+void editorDrawRows(std::string& buffer)
 {
     for (int y{0}; y < E.screenrows; ++y)
     {
-        write(STDOUT_FILENO, "~", 1);
+        // write(STDOUT_FILENO, "~", 1);
+        buffer.append(1, '~');
 
         if (y < E.screenrows - 1)
         {
-            write(STDOUT_FILENO, "\r\n", 2);
+            // write(STDOUT_FILENO, "\r\n", 2);
+            buffer.append("\r\n", 2);
         }
     }
 }
 
 void editorRefreshScreen()
 {
-    write(STDOUT_FILENO, "\x1b[2J", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
+    std::string buffer;
 
-    editorDrawRows();
+    // hide cursor
+    buffer.append("\x1b[?25l", 6);
+    buffer.append("\x1b[2J", 4);
+    buffer.append("\x1b[H", 3);
 
-    write(STDOUT_FILENO, "\x1b[H", 3);
+    editorDrawRows(buffer);
+
+    buffer.append("\x1b[H", 3);
+    // display cursor
+    buffer.append("\x1b[?25h", 6);
+
+    write(STDOUT_FILENO, buffer.c_str(), buffer.size());
 }
 
 /* input */
