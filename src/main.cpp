@@ -158,7 +158,7 @@ void editorRefreshScreen()
 
     editorDrawRows(buffer);
 
-    std::string cursor = std::format("\x1b[{};{}H", E.cursorX + 1, E.cursorY + 1);
+    std::string cursor = std::format("\x1b[{};{}H", E.cursorY + 1, E.cursorX + 1);
     buffer.append(cursor.c_str(), cursor.size());
 
     // display cursor
@@ -168,6 +168,25 @@ void editorRefreshScreen()
 }
 
 /* input */
+
+void editorMoveCursor(char key)
+{
+    switch (key)
+    {
+    case 'a':
+        E.cursorX--;
+        break;
+    case 'd':
+        E.cursorX++;
+        break;
+    case 'w':
+        E.cursorY--;
+        break;
+    case 's':
+        E.cursorY++;
+        break;
+    }
+}
 void editorProcessKeypress()
 {
     char c = editorReadKey();
@@ -178,6 +197,13 @@ void editorProcessKeypress()
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
+        break;
+
+    case 'w':
+    case 'a':
+    case 's':
+    case 'd':
+        editorMoveCursor(c);
         break;
     }
 }
