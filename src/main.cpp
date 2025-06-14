@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstdio>
 #include <errno.h>
+#include <format>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -15,6 +16,7 @@
 
 struct editorConfig
 {
+    int cursorX, cursorY;
     int screenrows;
     int screencols;
     termios original_termios;
@@ -156,7 +158,9 @@ void editorRefreshScreen()
 
     editorDrawRows(buffer);
 
-    buffer.append("\x1b[H", 3);
+    std::string cursor = std::format("\x1b[{};{}H", E.cursorX + 1, E.cursorY + 1);
+    buffer.append(cursor.c_str(), cursor.size());
+
     // display cursor
     buffer.append("\x1b[?25h", 6);
 
@@ -180,6 +184,9 @@ void editorProcessKeypress()
 
 void initEditor()
 {
+    E.cursorX = 0;
+    E.cursorY = 0;
+
     if (getWindowSize(E.screenrows, E.screencols) == -1)
         die("getWindowSize");
 }
