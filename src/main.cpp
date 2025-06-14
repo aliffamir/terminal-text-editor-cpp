@@ -14,6 +14,17 @@
 #define KILO_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 
+namespace EditorKey
+{
+enum EditorKey
+{
+    ARROW_UP = 1000,
+    ARROW_RIGHT,
+    ARROW_DOWN,
+    ARROW_LEFT,
+};
+} // namespace EditorKey
+
 struct editorConfig
 {
     int cursorX, cursorY;
@@ -56,7 +67,7 @@ void enableRawMode()
         die("tcsetattr");
 }
 
-char editorReadKey()
+int editorReadKey()
 {
     int nread;
     char c;
@@ -80,13 +91,13 @@ char editorReadKey()
             switch (seq[1])
             {
             case 'A':
-                return 'w';
+                return EditorKey::ARROW_UP;
             case 'B':
-                return 's';
+                return EditorKey::ARROW_DOWN;
             case 'C':
-                return 'd';
+                return EditorKey::ARROW_RIGHT;
             case 'D':
-                return 'a';
+                return EditorKey::ARROW_LEFT;
             }
         }
         return '\x1b';
@@ -198,27 +209,39 @@ void editorRefreshScreen()
 
 /* input */
 
-void editorMoveCursor(char key)
+void editorMoveCursor(int key)
 {
     switch (key)
     {
-    case 'a':
-        E.cursorX--;
+    case EditorKey::ARROW_LEFT:
+        if (E.cursorX > 0)
+        {
+            E.cursorX--;
+        }
         break;
-    case 'd':
-        E.cursorX++;
+    case EditorKey::ARROW_RIGHT:
+        if (E.cursorX < E.screencols)
+        {
+            E.cursorX++;
+        }
         break;
-    case 'w':
-        E.cursorY--;
+    case EditorKey::ARROW_UP:
+        if (E.cursorY > 0)
+        {
+            E.cursorY--;
+        }
         break;
-    case 's':
-        E.cursorY++;
+    case EditorKey::ARROW_DOWN:
+        if (E.cursorY < E.screenrows)
+        {
+            E.cursorY++;
+        }
         break;
     }
 }
 void editorProcessKeypress()
 {
-    char c = editorReadKey();
+    int c = editorReadKey();
 
     switch (c)
     {
@@ -228,10 +251,10 @@ void editorProcessKeypress()
         exit(0);
         break;
 
-    case 'w':
-    case 'a':
-    case 's':
-    case 'd':
+    case EditorKey::ARROW_UP:
+    case EditorKey::ARROW_LEFT:
+    case EditorKey::ARROW_DOWN:
+    case EditorKey::ARROW_RIGHT:
         editorMoveCursor(c);
         break;
     }
