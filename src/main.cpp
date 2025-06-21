@@ -203,7 +203,7 @@ int getWindowSize(int& rows, int& cols)
 /* row operations */
 void editorAppendRow(std::string_view line) {
   E.row.emplace_back(line);
-  E.numrows = 1;
+  E.numrows++;
 }
 
 /* file i/o */
@@ -215,8 +215,8 @@ void editorOpen(char* filename)
   {
     die("fs.open");
   }
-  std::string line;
-  if (std::getline(infile, line))
+
+  for(std::string line ; std::getline(infile, line);)
   {
     while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
     {
