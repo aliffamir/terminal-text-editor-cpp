@@ -33,6 +33,8 @@ enum EditorKey
 struct editorConfig
 {
   int cursorX, cursorY;
+  int rowoffset;
+  int coloffset;
   int screenrows;
   int screencols;
   int numrows;
@@ -201,7 +203,8 @@ int getWindowSize(int& rows, int& cols)
 }
 
 /* row operations */
-void editorAppendRow(std::string_view line) {
+void editorAppendRow(std::string_view line)
+{
   E.row.emplace_back(line);
   E.numrows++;
 }
@@ -216,7 +219,7 @@ void editorOpen(char* filename)
     die("fs.open");
   }
 
-  for(std::string line ; std::getline(infile, line);)
+  for (std::string line; std::getline(infile, line);)
   {
     while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
     {
@@ -229,11 +232,34 @@ void editorOpen(char* filename)
 }
 
 /* output */
+void editorScroll()
+{
+  // if
+  if (E.cursorY < E.rowoffset)
+  {
+    E.rowoffset = E.cursorY;
+  }
+  if (E.cursorY >= E.rowoffset + E.screenrows)
+  {
+    E.rowoffset = E.cursorY - E.screenrows + 1;
+  }
+
+  if (E.cursorX < E.coloffset)
+  {
+    E.coloffset = E.cursorX;
+  }
+  if (E.cursorX >= E.coloffset + E.screencols)
+  {
+    E.coloffset = E.cursorX - E.coloffset + 1;
+  }
+}
+
 void editorDrawRows(std::string& buffer)
 {
   for (int y{0}; y < E.screenrows; ++y)
   {
-    if (y >= E.numrows)
+    int filerow = y + E.rowoffset;
+    if (filerow >= E.numrows)
     {
       if (E.numrows == 0 && y == E.screenrows / 3)
       {
@@ -259,12 +285,16 @@ void editorDrawRows(std::string& buffer)
     }
     else
     {
-      int len = E.row[y].size();
+      int len = E.row[filerow].size() - E.coloffset;
+      if (len < 0)
+      {
+        len = 0;
+      }
       if (len > E.screencols)
       {
         len = E.screencols;
       }
-      buffer.append(E.row[y], 0, len);
+      buffer.append(E.row[filerow].substr(E.coloffset, len), 0, len);
     }
 
     buffer.append("\x1b[K", 3);
@@ -277,6 +307,8 @@ void editorDrawRows(std::string& buffer)
 
 void editorRefreshScreen()
 {
+  editorScroll();
+
   std::string buffer;
 
   // hide cursor
@@ -285,7 +317,7 @@ void editorRefreshScreen()
 
   editorDrawRows(buffer);
 
-  std::string cursor = std::format("\x1b[{};{}H", E.cursorY + 1, E.cursorX + 1);
+  std::string cursor = std::format("\x1b[{};{}H", (E.cursorY - E.rowoffset) + 1, (E.cursorX - E.coloffset) + 1);
   buffer.append(cursor.c_str(), cursor.size());
 
   // display cursor
@@ -307,10 +339,7 @@ void editorMoveCursor(int key)
     }
     break;
   case ARROW_RIGHT:
-    if (E.cursorX < E.screencols)
-    {
       E.cursorX++;
-    }
     break;
   case ARROW_UP:
     if (E.cursorY > 0)
@@ -319,13 +348,14 @@ void editorMoveCursor(int key)
     }
     break;
   case ARROW_DOWN:
-    if (E.cursorY < E.screenrows)
+    if (E.cursorY < E.numrows - 1)
     {
       E.cursorY++;
     }
     break;
   }
 }
+
 void editorProcessKeypress()
 {
   int c = editorReadKey();
@@ -368,8 +398,10 @@ void initEditor()
 {
   E.cursorX = 0;
   E.cursorY = 0;
+  E.rowoffset = 0;
+  E.coloffset = 0;
   E.numrows = 0;
-
+  E.row = {};
 
   if (getWindowSize(E.screenrows, E.screencols) == -1)
     die("getWindowSize");
@@ -379,7 +411,8 @@ int main(int argc, char* argv[])
 {
   enableRawMode();
   initEditor();
-  if (argc >= 2) {
+  if (argc >= 2)
+  {
     editorOpen(argv[1]);
   }
 
