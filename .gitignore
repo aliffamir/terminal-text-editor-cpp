@@ -98,3 +98,5 @@ include/SDL2
 include/SDL2_image
 lib/SDL2_image
 lib/SDL2
+
+.cache/
