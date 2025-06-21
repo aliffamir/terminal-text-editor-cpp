@@ -339,7 +339,10 @@ void editorMoveCursor(int key)
     }
     break;
   case ARROW_RIGHT:
+    if (E.cursorY < E.numrows && E.cursorX < E.row[E.cursorY].size())
+    {
       E.cursorX++;
+    }
     break;
   case ARROW_UP:
     if (E.cursorY > 0)
@@ -348,7 +351,7 @@ void editorMoveCursor(int key)
     }
     break;
   case ARROW_DOWN:
-    if (E.cursorY < E.numrows - 1)
+    if (E.cursorY < E.numrows)
     {
       E.cursorY++;
     }
