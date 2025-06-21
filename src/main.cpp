@@ -333,15 +333,25 @@ void editorMoveCursor(int key)
   switch (key)
   {
   case ARROW_LEFT:
-    if (E.cursorX > 0)
+    if (E.cursorX != 0)
     {
       E.cursorX--;
+    }
+    else if (E.cursorY > 0)
+    { // if cursorX == 0 and not first line move to previous line
+      E.cursorY--;
+      E.cursorX = E.row[E.cursorY].size();
     }
     break;
   case ARROW_RIGHT:
     if (E.cursorY < E.numrows && E.cursorX < E.row[E.cursorY].size())
     {
       E.cursorX++;
+    }
+    else if (E.cursorY < E.numrows && E.cursorX == E.row[E.cursorY].size())
+    {
+      E.cursorY++;
+      E.cursorX = 0;
     }
     break;
   case ARROW_UP:
@@ -356,6 +366,15 @@ void editorMoveCursor(int key)
       E.cursorY++;
     }
     break;
+  }
+
+  if (E.cursorY < E.numrows)
+  {
+    int rowLen = E.row[E.cursorY].size();
+    if (E.cursorX > rowLen)
+    {
+      E.cursorX = rowLen;
+    }
   }
 }
 
