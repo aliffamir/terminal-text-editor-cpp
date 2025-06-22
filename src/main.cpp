@@ -44,6 +44,7 @@ struct editorConfig
   int screencols;
   int numrows;
   std::vector<erow> row;
+  std::string filename;
   termios original_termios;
 };
 
@@ -283,6 +284,7 @@ void editorAppendRow(std::string_view line)
 /* file i/o */
 void editorOpen(char* filename)
 {
+  E.filename = filename;
   std::ifstream infile;
   infile.open(filename);
   if (!infile.is_open())
@@ -374,11 +376,36 @@ void editorDrawRows(std::string& buffer)
     }
 
     buffer.append("\x1b[K", 3);
-    if (y < E.screenrows - 1)
+    buffer.append("\r\n", 2);
+  }
+}
+
+void editorDrawStatusBar(std::string& buffer)
+{
+  buffer.append("\x1b[7m", 4);
+
+  std::string status = std::format("{:20s} - {:d}", E.filename.empty() ? "[No Name]" : E.filename, E.numrows);
+  std::size_t len{status.length() > E.screencols ? E.screencols : status.length()};
+
+  std::string rStatus = std::format("{:d}/{:d}", E.cursorY + 1, E.numrows);
+
+  buffer.append(status.c_str(), len);
+
+  while (len < E.screencols)
+  {
+    if (E.screencols - len == rStatus.length())
     {
-      buffer.append("\r\n", 2);
+      buffer.append(rStatus.c_str(), rStatus.length());
+      break;
+    }
+    else
+    {
+      buffer.append(" ");
+      ++len;
     }
   }
+
+  buffer.append("\x1b[m", 3);
 }
 
 void editorRefreshScreen()
@@ -392,6 +419,7 @@ void editorRefreshScreen()
   buffer.append("\x1b[H", 3);
 
   editorDrawRows(buffer);
+  editorDrawStatusBar(buffer);
 
   std::string cursor = std::format("\x1b[{};{}H", (E.cursorY - E.rowoffset) + 1, (E.renderX - E.coloffset) + 1);
   buffer.append(cursor.c_str(), cursor.size());
@@ -471,9 +499,10 @@ void editorProcessKeypress()
     break;
 
   case END_KEY:
-    if (E.cursorY < E.numrows) {
-        E.cursorY = E.row[E.cursorY].chars.size();
-      }
+    if (E.cursorY < E.numrows)
+    {
+      E.cursorY = E.row[E.cursorY].chars.size();
+    }
     break;
 
   case PAGE_UP:
@@ -514,9 +543,13 @@ void initEditor()
   E.coloffset = 0;
   E.numrows = 0;
   E.row = {};
+  E.filename = "";
 
   if (getWindowSize(E.screenrows, E.screencols) == -1)
     die("getWindowSize");
+
+  // reserve a line at the bottom for our status bar
+  E.screenrows -= 1;
 }
 
 int main(int argc, char* argv[])
