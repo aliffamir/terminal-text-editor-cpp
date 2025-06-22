@@ -250,7 +250,6 @@ int editorRowCxToRx(erow& row, int cursorX)
 void editorUpdateRow(erow& row)
 {
   row.render.clear();
-  // row.render = replaceAll('\t', std::string{KILO_TAB_STOP, ' '}, row.chars);
   std::string result;
   int idx{0};
   for (const char ch : row.chars)
@@ -282,6 +281,25 @@ void editorAppendRow(std::string_view line)
   E.row.emplace_back(erow{static_cast<std::string>(line), ""});
   editorUpdateRow(E.row[E.numrows]);
   E.numrows++;
+}
+
+void editorRowInsertChar(erow& row, int at, int c) {
+  if (at < 0 || at > row.chars.size()) {
+    at = row.chars.size();
+  }
+  row.chars.insert(at, 1, c);
+  editorUpdateRow(row);
+}
+
+/* editor operations */
+
+void editorInsertChar(int c) {
+  if (E.cursorY == E.numrows) {
+    editorAppendRow("");
+  }
+
+  editorRowInsertChar(E.row[E.cursorY], E.cursorX, c);
+  E.cursorX++;
 }
 
 /* file i/o */
@@ -449,6 +467,7 @@ void editorRefreshScreen()
   write(STDOUT_FILENO, buffer.c_str(), buffer.size());
 }
 
+// For info on variadic templates, see (https://learn.microsoft.com/en-us/cpp/cpp/ellipses-and-variadic-templates?view=msvc-170)
 template <typename... Args> void editorSetStatusMessage(std::string_view fmt, Args&&... args)
 {
   // TODO: revisit to see what std::forward and std::make_format_args() do
@@ -556,6 +575,10 @@ void editorProcessKeypress()
   case EditorKey::ARROW_DOWN:
   case EditorKey::ARROW_RIGHT:
     editorMoveCursor(c);
+    break;
+
+  default:
+    editorInsertChar(c);
     break;
   }
 }
