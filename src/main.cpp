@@ -4,9 +4,6 @@
 #include <errno.h>
 #include <format>
 #include <fstream>
-#include <ios>
-#include <iostream>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/ioctl.h>
@@ -16,6 +13,7 @@
 
 #define KILO_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define KILO_TAB_STOP 8
 
 enum EditorKey
 {
@@ -30,15 +28,22 @@ enum EditorKey
   PAGE_DOWN,
 };
 
+struct erow
+{
+  std::string chars;
+  std::string render;
+};
+
 struct editorConfig
 {
   int cursorX, cursorY;
+  int renderX;
   int rowoffset;
   int coloffset;
   int screenrows;
   int screencols;
   int numrows;
-  std::vector<std::string> row;
+  std::vector<erow> row;
   termios original_termios;
 };
 
@@ -202,10 +207,76 @@ int getWindowSize(int& rows, int& cols)
   }
 }
 
+/* helpers */
+
+// replaces a char to a specified string in place, str is an INOUT param
+std::string replaceAll(char from, std::string_view to, std::string& str)
+{
+  std::string newString;
+  for (char& ch : str)
+  {
+    if (ch == from)
+    {
+      newString += to;
+    }
+    else
+    {
+      newString += ch;
+    }
+  }
+  return newString;
+}
+
 /* row operations */
+
+int editorRowCxToRx(erow& row, int cursorX)
+{
+  int renderX = 0;
+  for (int j{0}; j < cursorX && j < static_cast<int>(row.chars.size()); ++j)
+  {
+    if (row.chars[j] == '\t')
+    {
+      renderX += (KILO_TAB_STOP - 1) - (renderX & KILO_TAB_STOP);
+    }
+    renderX++;
+  }
+  return renderX;
+}
+
+void editorUpdateRow(erow& row)
+{
+  row.render.clear();
+  // row.render = replaceAll('\t', std::string{KILO_TAB_STOP, ' '}, row.chars);
+  std::string result;
+  int idx{0};
+  for (const char ch : row.chars)
+  {
+    if (ch == '\t')
+    {
+      result += ' ';
+      ++idx;
+
+      // fill with spaces until we reach the next tab stop
+      while (idx % KILO_TAB_STOP != 0)
+      {
+        result += ' ';
+        ++idx;
+      }
+    }
+    else
+    {
+      result += ch;
+      ++idx;
+    }
+  }
+
+  row.render = std::move(result);
+}
+
 void editorAppendRow(std::string_view line)
 {
-  E.row.emplace_back(line);
+  E.row.emplace_back(erow{static_cast<std::string>(line), ""});
+  editorUpdateRow(E.row[E.numrows]);
   E.numrows++;
 }
 
@@ -234,7 +305,12 @@ void editorOpen(char* filename)
 /* output */
 void editorScroll()
 {
-  // if
+  E.renderX = E.cursorX;
+
+  if (E.cursorY < E.numrows)
+  {
+    E.renderX = editorRowCxToRx(E.row[E.cursorY], E.cursorX);
+  }
   if (E.cursorY < E.rowoffset)
   {
     E.rowoffset = E.cursorY;
@@ -244,13 +320,13 @@ void editorScroll()
     E.rowoffset = E.cursorY - E.screenrows + 1;
   }
 
-  if (E.cursorX < E.coloffset)
+  if (E.renderX < E.coloffset)
   {
-    E.coloffset = E.cursorX;
+    E.coloffset = E.renderX;
   }
-  if (E.cursorX >= E.coloffset + E.screencols)
+  if (E.renderX >= E.coloffset + E.screencols)
   {
-    E.coloffset = E.cursorX - E.coloffset + 1;
+    E.coloffset = E.renderX - E.coloffset + 1;
   }
 }
 
@@ -285,7 +361,7 @@ void editorDrawRows(std::string& buffer)
     }
     else
     {
-      int len = E.row[filerow].size() - E.coloffset;
+      int len = E.row[filerow].render.size() - E.coloffset;
       if (len < 0)
       {
         len = 0;
@@ -294,7 +370,7 @@ void editorDrawRows(std::string& buffer)
       {
         len = E.screencols;
       }
-      buffer.append(E.row[filerow].substr(E.coloffset, len), 0, len);
+      buffer.append(E.row[filerow].render.substr(E.coloffset, len), 0, len);
     }
 
     buffer.append("\x1b[K", 3);
@@ -317,7 +393,7 @@ void editorRefreshScreen()
 
   editorDrawRows(buffer);
 
-  std::string cursor = std::format("\x1b[{};{}H", (E.cursorY - E.rowoffset) + 1, (E.cursorX - E.coloffset) + 1);
+  std::string cursor = std::format("\x1b[{};{}H", (E.cursorY - E.rowoffset) + 1, (E.renderX - E.coloffset) + 1);
   buffer.append(cursor.c_str(), cursor.size());
 
   // display cursor
@@ -340,15 +416,15 @@ void editorMoveCursor(int key)
     else if (E.cursorY > 0)
     { // if cursorX == 0 and not first line move to previous line
       E.cursorY--;
-      E.cursorX = E.row[E.cursorY].size();
+      E.cursorX = E.row[E.cursorY].chars.size();
     }
     break;
   case ARROW_RIGHT:
-    if (E.cursorY < E.numrows && E.cursorX < E.row[E.cursorY].size())
+    if (E.cursorY < E.numrows && E.cursorX < E.row[E.cursorY].chars.size())
     {
       E.cursorX++;
     }
-    else if (E.cursorY < E.numrows && E.cursorX == E.row[E.cursorY].size())
+    else if (E.cursorY < E.numrows && E.cursorX == E.row[E.cursorY].chars.size())
     {
       E.cursorY++;
       E.cursorX = 0;
@@ -370,7 +446,7 @@ void editorMoveCursor(int key)
 
   if (E.cursorY < E.numrows)
   {
-    int rowLen = E.row[E.cursorY].size();
+    int rowLen = E.row[E.cursorY].chars.size();
     if (E.cursorX > rowLen)
     {
       E.cursorX = rowLen;
@@ -420,6 +496,7 @@ void initEditor()
 {
   E.cursorX = 0;
   E.cursorY = 0;
+  E.renderX = 0;
   E.rowoffset = 0;
   E.coloffset = 0;
   E.numrows = 0;
