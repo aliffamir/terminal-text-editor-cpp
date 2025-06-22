@@ -471,11 +471,24 @@ void editorProcessKeypress()
     break;
 
   case END_KEY:
-    E.cursorX = E.screencols - 1;
+    if (E.cursorY < E.numrows) {
+        E.cursorY = E.row[E.cursorY].chars.size();
+      }
     break;
 
   case PAGE_UP:
   case PAGE_DOWN: {
+    if (c == PAGE_UP)
+    {
+      E.cursorY = E.rowoffset;
+    }
+    else if (c == PAGE_DOWN)
+    {
+      E.cursorY = E.rowoffset + E.screenrows - 1;
+      if (E.cursorY > E.numrows)
+        E.cursorY = E.numrows;
+    }
+
     int times = E.screenrows;
     while (times--)
     {
