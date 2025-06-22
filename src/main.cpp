@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <ctime>
 #include <errno.h>
 #include <format>
 #include <fstream>
@@ -45,6 +46,8 @@ struct editorConfig
   int numrows;
   std::vector<erow> row;
   std::string filename;
+  std::string statusmsg;
+  std::time_t statusmsg_time;
   termios original_termios;
 };
 
@@ -406,6 +409,21 @@ void editorDrawStatusBar(std::string& buffer)
   }
 
   buffer.append("\x1b[m", 3);
+  buffer.append("\r\n", 2);
+}
+
+void editorDrawMessageBar(std::string& buffer)
+{
+  buffer.append("\x1b[K", 3);
+  int msgLen{static_cast<int>(E.statusmsg.length())};
+  if (msgLen > E.screencols)
+    msgLen = E.screencols;
+
+  if (msgLen && std::time(nullptr) - E.statusmsg_time < 5)
+  {
+
+    buffer.append(E.statusmsg.c_str(), msgLen);
+  }
 }
 
 void editorRefreshScreen()
@@ -420,6 +438,7 @@ void editorRefreshScreen()
 
   editorDrawRows(buffer);
   editorDrawStatusBar(buffer);
+  editorDrawMessageBar(buffer);
 
   std::string cursor = std::format("\x1b[{};{}H", (E.cursorY - E.rowoffset) + 1, (E.renderX - E.coloffset) + 1);
   buffer.append(cursor.c_str(), cursor.size());
@@ -428,6 +447,13 @@ void editorRefreshScreen()
   buffer.append("\x1b[?25h", 6);
 
   write(STDOUT_FILENO, buffer.c_str(), buffer.size());
+}
+
+template <typename... Args> void editorSetStatusMessage(std::string_view fmt, Args&&... args)
+{
+  // TODO: revisit to see what std::forward and std::make_format_args() do
+  E.statusmsg = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
+  E.statusmsg_time = std::time(nullptr);
 }
 
 /* input */
@@ -544,12 +570,14 @@ void initEditor()
   E.numrows = 0;
   E.row = {};
   E.filename = "";
+  E.statusmsg = "";
+  E.statusmsg_time = 0;
 
   if (getWindowSize(E.screenrows, E.screencols) == -1)
     die("getWindowSize");
 
   // reserve a line at the bottom for our status bar
-  E.screenrows -= 1;
+  E.screenrows -= 2;
 }
 
 int main(int argc, char* argv[])
@@ -560,6 +588,8 @@ int main(int argc, char* argv[])
   {
     editorOpen(argv[1]);
   }
+
+  editorSetStatusMessage("HELP: Ctrl-Q = quit");
 
   while (1)
   {
