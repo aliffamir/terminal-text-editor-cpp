@@ -18,6 +18,7 @@
 
 enum EditorKey
 {
+  BACKSPACE = 127,
   ARROW_UP = 1000,
   ARROW_RIGHT,
   ARROW_DOWN,
@@ -283,8 +284,10 @@ void editorAppendRow(std::string_view line)
   E.numrows++;
 }
 
-void editorRowInsertChar(erow& row, int at, int c) {
-  if (at < 0 || at > row.chars.size()) {
+void editorRowInsertChar(erow& row, int at, int c)
+{
+  if (at < 0 || at > row.chars.size())
+  {
     at = row.chars.size();
   }
   row.chars.insert(at, 1, c);
@@ -293,8 +296,10 @@ void editorRowInsertChar(erow& row, int at, int c) {
 
 /* editor operations */
 
-void editorInsertChar(int c) {
-  if (E.cursorY == E.numrows) {
+void editorInsertChar(int c)
+{
+  if (E.cursorY == E.numrows)
+  {
     editorAppendRow("");
   }
 
@@ -303,6 +308,17 @@ void editorInsertChar(int c) {
 }
 
 /* file i/o */
+std::string editorRowsToString()
+{
+  std::string fileContent;
+  for (const erow row : E.row)
+  {
+    fileContent += row.chars;
+    fileContent += '\n';
+  }
+  return fileContent;
+}
+
 void editorOpen(char* filename)
 {
   E.filename = filename;
@@ -323,6 +339,19 @@ void editorOpen(char* filename)
     editorAppendRow(line);
   }
   infile.close();
+}
+
+void editorSave()
+{
+  if (E.filename.empty())
+    return;
+
+  std::string fileContent = editorRowsToString();
+
+  std::ofstream ostream(E.filename, std::ios::out);
+  ostream << fileContent;
+
+  ostream.close();
 }
 
 /* output */
@@ -467,7 +496,8 @@ void editorRefreshScreen()
   write(STDOUT_FILENO, buffer.c_str(), buffer.size());
 }
 
-// For info on variadic templates, see (https://learn.microsoft.com/en-us/cpp/cpp/ellipses-and-variadic-templates?view=msvc-170)
+// For info on variadic templates, see
+// (https://learn.microsoft.com/en-us/cpp/cpp/ellipses-and-variadic-templates?view=msvc-170)
 template <typename... Args> void editorSetStatusMessage(std::string_view fmt, Args&&... args)
 {
   // TODO: revisit to see what std::forward and std::make_format_args() do
@@ -533,10 +563,18 @@ void editorProcessKeypress()
 
   switch (c)
   {
+  case '\r':
+    // TODO:
+    break;
+
   case CTRL_KEY('q'):
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
     exit(0);
+    break;
+
+  case CTRL_KEY('s'):
+    editorSave();
     break;
 
   case HOME_KEY:
@@ -548,6 +586,12 @@ void editorProcessKeypress()
     {
       E.cursorY = E.row[E.cursorY].chars.size();
     }
+    break;
+
+  case BACKSPACE:
+  case CTRL_KEY('h'):
+  case DEL_KEY:
+    // TODO
     break;
 
   case PAGE_UP:
@@ -575,6 +619,10 @@ void editorProcessKeypress()
   case EditorKey::ARROW_DOWN:
   case EditorKey::ARROW_RIGHT:
     editorMoveCursor(c);
+    break;
+
+  case CTRL_KEY('l'):
+  case '\x1b':
     break;
 
   default:
