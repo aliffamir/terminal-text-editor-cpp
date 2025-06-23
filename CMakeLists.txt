@@ -11,3 +11,6 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 # Create executables
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Add include directories
+target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_SOURCE_DIR}/include/")
