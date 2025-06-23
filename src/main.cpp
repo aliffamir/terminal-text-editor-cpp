@@ -1,3 +1,4 @@
+#include "editor.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -10,11 +11,14 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <vector>
+#include <cstdarg>
 
 #define KILO_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define KILO_TAB_STOP 8
+
+/* forward declarations */
+void editorSetStatusMessage(std::string_view fmt, ...);
 
 enum EditorKey
 {
@@ -28,28 +32,6 @@ enum EditorKey
   END_KEY,
   PAGE_UP,
   PAGE_DOWN,
-};
-
-struct erow
-{
-  std::string chars;
-  std::string render;
-};
-
-struct editorConfig
-{
-  int cursorX, cursorY;
-  int renderX;
-  int rowoffset;
-  int coloffset;
-  int screenrows;
-  int screencols;
-  int numrows;
-  std::vector<erow> row;
-  std::string filename;
-  std::string statusmsg;
-  std::time_t statusmsg_time;
-  termios original_termios;
 };
 
 editorConfig E;
@@ -349,9 +331,18 @@ void editorSave()
   std::string fileContent = editorRowsToString();
 
   std::ofstream ostream(E.filename, std::ios::out);
-  ostream << fileContent;
 
-  ostream.close();
+  if (ostream)
+  {
+    if (ostream.write(fileContent.c_str(), fileContent.length()))
+    {
+      editorSetStatusMessage("%d bytes written to disk", fileContent.length());
+      return;
+    }
+    ostream.close();
+  }
+
+  editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
 }
 
 /* output */
@@ -496,12 +487,25 @@ void editorRefreshScreen()
   write(STDOUT_FILENO, buffer.c_str(), buffer.size());
 }
 
-// For info on variadic templates, see
-// (https://learn.microsoft.com/en-us/cpp/cpp/ellipses-and-variadic-templates?view=msvc-170)
-template <typename... Args> void editorSetStatusMessage(std::string_view fmt, Args&&... args)
+// // For info on variadic templates, see
+// // (https://learn.microsoft.com/en-us/cpp/cpp/ellipses-and-variadic-templates?view=msvc-170)
+// template <typename... Args> void editorSetStatusMessage(std::string_view fmt, Args&&... args)
+// {
+//   // TODO: revisit to see what std::forward and std::make_format_args() do
+//   E.statusmsg = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
+//   E.statusmsg_time = std::time(nullptr);
+// }
+
+void editorSetStatusMessage(std::string_view fmt, ...)
 {
-  // TODO: revisit to see what std::forward and std::make_format_args() do
-  E.statusmsg = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
+  std::va_list list;
+  va_start(list, fmt);
+  
+  char buf[256];
+  std::vsnprintf(buf, sizeof(buf), static_cast<std::string>(fmt).c_str(), list);
+  va_end(list);
+  
+  E.statusmsg = buf;
   E.statusmsg_time = std::time(nullptr);
 }
 
@@ -660,7 +664,7 @@ int main(int argc, char* argv[])
     editorOpen(argv[1]);
   }
 
-  editorSetStatusMessage("HELP: Ctrl-Q = quit");
+  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
   while (1)
   {
