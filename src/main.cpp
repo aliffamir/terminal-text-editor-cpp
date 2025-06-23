@@ -1,4 +1,3 @@
-#include "editor.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -33,6 +32,29 @@ enum EditorKey
   PAGE_UP,
   PAGE_DOWN,
 };
+
+struct erow
+{
+  std::string chars;
+  std::string render;
+};
+
+struct editorConfig
+{
+  int cursorX, cursorY;
+  int renderX;
+  int rowoffset;
+  int coloffset;
+  int screenrows;
+  int screencols;
+  int numrows;
+  std::vector<erow> row;
+  std::string filename;
+  std::string statusmsg;
+  std::time_t statusmsg_time;
+  termios original_termios;
+};
+
 
 editorConfig E;
 
