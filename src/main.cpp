@@ -300,6 +300,15 @@ void editorRowInsertChar(erow& row, int at, int c)
   E.dirty++;
 }
 
+void editorRowDeleteChar(erow& row) {
+  if (!row.chars.empty() && E.cursorX != 0) {
+    row.chars.erase(E.cursorX, 1);
+    E.cursorX--;
+  }
+  editorUpdateRow(row);
+  E.dirty++;
+}
+
 /* editor operations */
 
 void editorInsertChar(int c)
@@ -630,7 +639,7 @@ void editorProcessKeypress()
   case BACKSPACE:
   case CTRL_KEY('h'):
   case DEL_KEY:
-    // TODO
+    editorRowDeleteChar(E.row[E.cursorY]);
     break;
 
   case PAGE_UP:
@@ -668,6 +677,9 @@ void editorProcessKeypress()
     editorInsertChar(c);
     break;
   }
+
+  // reset quit_times if other key pressed
+  quit_times = KILO_QUIT_TIMES;
 }
 
 void initEditor()
