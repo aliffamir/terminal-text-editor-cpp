@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
 #include <cstdio>
 #include <ctime>
 #include <errno.h>
@@ -10,11 +11,11 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <cstdarg>
 
 #define KILO_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define KILO_TAB_STOP 8
+#define KILO_QUIT_TIMES 3
 
 /* forward declarations */
 void editorSetStatusMessage(std::string_view fmt, ...);
@@ -56,7 +57,6 @@ struct editorConfig
   termios original_termios;
 };
 
-
 editorConfig E;
 
 void die(const char* s)
@@ -64,7 +64,6 @@ void die(const char* s)
   perror(s);
   exit(1);
 }
-
 
 void disableRawMode()
 {
@@ -452,7 +451,8 @@ void editorDrawStatusBar(std::string& buffer)
 {
   buffer.append("\x1b[7m", 4);
 
-  std::string status = std::format("{:20s} - {:d} lines {:s}", E.filename.empty() ? "[No Name]" : E.filename, E.numrows, E.dirty ? "(modified)" : "");
+  std::string status = std::format("{:20s} - {:d} lines {:s}", E.filename.empty() ? "[No Name]" : E.filename, E.numrows,
+                                   E.dirty ? "(modified)" : "");
   std::size_t len{status.length() > E.screencols ? E.screencols : status.length()};
 
   std::string rStatus = std::format("{:d}/{:d}", E.cursorY + 1, E.numrows);
@@ -527,11 +527,11 @@ void editorSetStatusMessage(std::string_view fmt, ...)
 {
   std::va_list list;
   va_start(list, fmt);
-  
+
   char buf[256];
   std::vsnprintf(buf, sizeof(buf), static_cast<std::string>(fmt).c_str(), list);
   va_end(list);
-  
+
   E.statusmsg = buf;
   E.statusmsg_time = std::time(nullptr);
 }
@@ -590,6 +590,8 @@ void editorMoveCursor(int key)
 
 void editorProcessKeypress()
 {
+  static int quit_times = KILO_QUIT_TIMES;
+
   int c = editorReadKey();
 
   switch (c)
@@ -599,6 +601,12 @@ void editorProcessKeypress()
     break;
 
   case CTRL_KEY('q'):
+    if (E.dirty && quit_times > 0)
+    {
+      editorSetStatusMessage("WARNING! File has unsaved changes. Press Ctrl-Q %d more %s to quit.", quit_times, quit_times == 1 ? "time" : "times");
+      quit_times--;
+      return;
+    }
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
     exit(0);
