@@ -49,6 +49,7 @@ struct editorConfig
   int screencols;
   int numrows;
   std::vector<erow> row;
+  int dirty;
   std::string filename;
   std::string statusmsg;
   std::time_t statusmsg_time;
@@ -64,7 +65,7 @@ void die(const char* s)
   exit(1);
 }
 
-/* terminal */
+
 void disableRawMode()
 {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.original_termios) == -1)
@@ -286,6 +287,7 @@ void editorAppendRow(std::string_view line)
   E.row.emplace_back(erow{static_cast<std::string>(line), ""});
   editorUpdateRow(E.row[E.numrows]);
   E.numrows++;
+  E.dirty++;
 }
 
 void editorRowInsertChar(erow& row, int at, int c)
@@ -296,6 +298,7 @@ void editorRowInsertChar(erow& row, int at, int c)
   }
   row.chars.insert(at, 1, c);
   editorUpdateRow(row);
+  E.dirty++;
 }
 
 /* editor operations */
@@ -343,6 +346,7 @@ void editorOpen(char* filename)
     editorAppendRow(line);
   }
   infile.close();
+  E.dirty = 0;
 }
 
 void editorSave()
@@ -359,6 +363,7 @@ void editorSave()
     if (ostream.write(fileContent.c_str(), fileContent.length()))
     {
       editorSetStatusMessage("%d bytes written to disk", fileContent.length());
+      E.dirty = 0;
       return;
     }
     ostream.close();
@@ -447,7 +452,7 @@ void editorDrawStatusBar(std::string& buffer)
 {
   buffer.append("\x1b[7m", 4);
 
-  std::string status = std::format("{:20s} - {:d}", E.filename.empty() ? "[No Name]" : E.filename, E.numrows);
+  std::string status = std::format("{:20s} - {:d} lines {:s}", E.filename.empty() ? "[No Name]" : E.filename, E.numrows, E.dirty ? "(modified)" : "");
   std::size_t len{status.length() > E.screencols ? E.screencols : status.length()};
 
   std::string rStatus = std::format("{:d}/{:d}", E.cursorY + 1, E.numrows);
@@ -666,6 +671,7 @@ void initEditor()
   E.coloffset = 0;
   E.numrows = 0;
   E.row = {};
+  E.dirty = 0;
   E.filename = "";
   E.statusmsg = "";
   E.statusmsg_time = 0;
