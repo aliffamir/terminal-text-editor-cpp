@@ -19,6 +19,8 @@
 
 /* forward declarations */
 void editorSetStatusMessage(std::string_view fmt, ...);
+void editorRefreshScreen();
+std::string editorPrompt(std::string&& prompt);
 
 enum EditorKey
 {
@@ -283,7 +285,8 @@ void editorUpdateRow(erow& row)
 
 void editorInsertRow(int at, std::string_view line)
 {
-  if (at < 0 || at > E.numrows) return;
+  if (at < 0 || at > E.numrows)
+    return;
 
   E.row.emplace(E.row.begin() + at, erow{static_cast<std::string>(line), ""});
   editorUpdateRow(E.row[at]);
@@ -348,7 +351,8 @@ void editorDelChar()
 {
   if (E.cursorY == E.numrows)
     return;
-  if (E.cursorY == 0 && E.cursorX == 0) return;
+  if (E.cursorY == 0 && E.cursorX == 0)
+    return;
 
   if (E.cursorX > 0)
   {
@@ -357,7 +361,7 @@ void editorDelChar()
   }
   else
   {
-    int prevLen = E.row[E.cursorY -1].chars.length();
+    int prevLen = E.row[E.cursorY - 1].chars.length();
     editorRowAppendString(E.row[E.cursorY - 1], E.row[E.cursorY].chars);
     editorDelRow(E.row[E.cursorY], E.cursorY);
     E.cursorY--;
@@ -370,7 +374,9 @@ void editorInsertNewline()
   if (E.cursorX == 0)
   {
     editorInsertRow(E.cursorY, "");
-  } else {
+  }
+  else
+  {
     erow& row = E.row[E.cursorY];
     editorInsertRow(E.cursorY + 1, row.chars.substr(E.cursorX));
     row.chars.erase(E.cursorX);
@@ -418,7 +424,13 @@ void editorOpen(char* filename)
 void editorSave()
 {
   if (E.filename.empty())
-    return;
+  {
+    E.filename = editorPrompt("Save as: %s");
+    if (E.filename.empty()) {
+      editorSetStatusMessage("Save aborted");
+      return;
+    }
+  }
 
   std::string fileContent = editorRowsToString();
 
@@ -604,6 +616,41 @@ void editorSetStatusMessage(std::string_view fmt, ...)
 }
 
 /* input */
+
+std::string editorPrompt(std::string&& prompt)
+{
+  std::string buf;
+  while (true)
+  {
+    editorSetStatusMessage(prompt, buf.c_str());
+    editorRefreshScreen();
+
+    int c = editorReadKey();
+    if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
+      if (!buf.empty()) {
+        buf.pop_back();
+      }
+    }
+    else if (c == '\x1b')
+    {
+      return "";
+    }
+    // if enter key
+    else if (c == '\r')
+    {
+      if (!buf.empty())
+      {
+
+        editorSetStatusMessage("");
+        return buf;
+      }
+    }
+    else if (!iscntrl(c) && c < 128)
+    {
+      buf += c;
+    }
+  }
+}
 
 void editorMoveCursor(int key)
 {
