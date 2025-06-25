@@ -300,12 +300,32 @@ void editorRowInsertChar(erow& row, int at, int c)
   E.dirty++;
 }
 
-void editorRowDeleteChar(erow& row) {
-  if (!row.chars.empty() && E.cursorX != 0) {
-    row.chars.erase(E.cursorX, 1);
-    E.cursorX--;
+void editorRowDeleteChar(erow& row, int at)
+{
+  if (at < 0 || at >= row.chars.length())
+  {
+    return;
   }
+
+  row.chars.erase(E.cursorX, 1);
   editorUpdateRow(row);
+  E.dirty++;
+}
+
+void editorRowAppendString(erow& row, std::string_view str)
+{
+  row.chars.append(str);
+  editorUpdateRow(row);
+  E.dirty++;
+}
+
+void editorDelRow(erow& row, int at)
+{
+  if (at < 0 || at >= E.numrows)
+    return;
+
+  E.row.erase(E.row.begin() + at);
+  E.numrows--;
   E.dirty++;
 }
 
@@ -320,6 +340,28 @@ void editorInsertChar(int c)
 
   editorRowInsertChar(E.row[E.cursorY], E.cursorX, c);
   E.cursorX++;
+}
+
+void editorDelChar()
+{
+  if (E.cursorY == E.numrows)
+    return;
+
+  if (E.cursorX == 0 && E.cursorY == 0)
+    return;
+
+  if (E.cursorX > 0)
+  {
+    editorRowDeleteChar(E.row[E.cursorY], E.cursorX);
+    E.cursorX--;
+  }
+  else
+  {
+    E.cursorX = E.row[E.cursorY - 1].chars.length() - 1;
+    editorRowAppendString(E.row[E.cursorY - 1], E.row[E.cursorY].chars);
+    editorDelRow(E.row[E.cursorY], E.cursorY);
+    E.cursorY--;
+  }
 }
 
 /* file i/o */
@@ -612,7 +654,8 @@ void editorProcessKeypress()
   case CTRL_KEY('q'):
     if (E.dirty && quit_times > 0)
     {
-      editorSetStatusMessage("WARNING! File has unsaved changes. Press Ctrl-Q %d more %s to quit.", quit_times, quit_times == 1 ? "time" : "times");
+      editorSetStatusMessage("WARNING! File has unsaved changes. Press Ctrl-Q %d more %s to quit.", quit_times,
+                             quit_times == 1 ? "time" : "times");
       quit_times--;
       return;
     }
@@ -639,7 +682,7 @@ void editorProcessKeypress()
   case BACKSPACE:
   case CTRL_KEY('h'):
   case DEL_KEY:
-    editorRowDeleteChar(E.row[E.cursorY]);
+    editorDelChar();
     break;
 
   case PAGE_UP:
