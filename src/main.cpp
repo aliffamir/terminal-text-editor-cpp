@@ -350,19 +350,20 @@ void editorDelChar()
 {
   if (E.cursorY == E.numrows)
     return;
-  if (E.cursorY == 0 && E.row[E.cursorY].chars.empty()) return;
+  if (E.cursorY == 0 && E.cursorX == 0) return;
 
-  if (E.cursorX >= 0)
+  if (E.cursorX > 0)
   {
     editorRowDeleteChar(E.row[E.cursorY], E.cursorX - 1);
     E.cursorX--;
   }
   else
   {
-    E.cursorX = E.row[E.cursorY - 1].chars.length() - 1;
+    int prevLen = E.row[E.cursorY -1].chars.length();
     editorRowAppendString(E.row[E.cursorY - 1], E.row[E.cursorY].chars);
     editorDelRow(E.row[E.cursorY], E.cursorY);
     E.cursorY--;
+    E.cursorX = prevLen;
   }
 }
 
