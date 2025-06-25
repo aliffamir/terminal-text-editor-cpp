@@ -283,8 +283,10 @@ void editorUpdateRow(erow& row)
 
 void editorInsertRow(int at, std::string_view line)
 {
+  if (at < 0 || at > E.numrows) return;
+
   E.row.emplace(E.row.begin() + at, erow{static_cast<std::string>(line), ""});
-  editorUpdateRow(E.row[E.numrows]);
+  editorUpdateRow(E.row[at]);
   E.numrows++;
   E.dirty++;
 }
@@ -329,10 +331,6 @@ void editorDelRow(erow& row, int at)
   E.dirty++;
 }
 
-void editorRowInsertString(erow& row, std::string_view str)
-{
-}
-
 /* editor operations */
 
 void editorInsertChar(int c)
@@ -372,13 +370,11 @@ void editorInsertNewline()
   if (E.cursorX == 0)
   {
     editorInsertRow(E.cursorY, "");
-  }
-  else if (E.cursorX == E.row[E.cursorY].chars.length())
-  {
-    editorInsertRow(E.cursorY + 1, "");
-  }
-  else
-  {
+  } else {
+    erow& row = E.row[E.cursorY];
+    editorInsertRow(E.cursorY + 1, row.chars.substr(E.cursorX));
+    row.chars.erase(E.cursorX);
+    editorUpdateRow(row);
   }
   E.cursorY++;
   E.cursorX = 0;
