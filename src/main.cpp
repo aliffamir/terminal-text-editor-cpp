@@ -281,9 +281,9 @@ void editorUpdateRow(erow& row)
   row.render = std::move(result);
 }
 
-void editorAppendRow(std::string_view line)
+void editorInsertRow(int at, std::string_view line)
 {
-  E.row.emplace_back(erow{static_cast<std::string>(line), ""});
+  E.row.emplace(E.row.begin() + at, erow{static_cast<std::string>(line), ""});
   editorUpdateRow(E.row[E.numrows]);
   E.numrows++;
   E.dirty++;
@@ -307,7 +307,7 @@ void editorRowDeleteChar(erow& row, int at)
     return;
   }
 
-  row.chars.erase(E.cursorX, 1);
+  row.chars.erase(at, 1);
   editorUpdateRow(row);
   E.dirty++;
 }
@@ -329,13 +329,17 @@ void editorDelRow(erow& row, int at)
   E.dirty++;
 }
 
+void editorRowInsertString(erow& row, std::string_view str)
+{
+}
+
 /* editor operations */
 
 void editorInsertChar(int c)
 {
   if (E.cursorY == E.numrows)
   {
-    editorAppendRow("");
+    editorInsertRow(E.numrows, "");
   }
 
   editorRowInsertChar(E.row[E.cursorY], E.cursorX, c);
@@ -346,13 +350,11 @@ void editorDelChar()
 {
   if (E.cursorY == E.numrows)
     return;
+  if (E.cursorY == 0 && E.row[E.cursorY].chars.empty()) return;
 
-  if (E.cursorX == 0 && E.cursorY == 0)
-    return;
-
-  if (E.cursorX > 0)
+  if (E.cursorX >= 0)
   {
-    editorRowDeleteChar(E.row[E.cursorY], E.cursorX);
+    editorRowDeleteChar(E.row[E.cursorY], E.cursorX - 1);
     E.cursorX--;
   }
   else
@@ -362,6 +364,23 @@ void editorDelChar()
     editorDelRow(E.row[E.cursorY], E.cursorY);
     E.cursorY--;
   }
+}
+
+void editorInsertNewline()
+{
+  if (E.cursorX == 0)
+  {
+    editorInsertRow(E.cursorY, "");
+  }
+  else if (E.cursorX == E.row[E.cursorY].chars.length())
+  {
+    editorInsertRow(E.cursorY + 1, "");
+  }
+  else
+  {
+  }
+  E.cursorY++;
+  E.cursorX = 0;
 }
 
 /* file i/o */
@@ -393,7 +412,7 @@ void editorOpen(char* filename)
       line.pop_back();
     }
 
-    editorAppendRow(line);
+    editorInsertRow(E.numrows, line);
   }
   infile.close();
   E.dirty = 0;
@@ -648,7 +667,7 @@ void editorProcessKeypress()
   switch (c)
   {
   case '\r':
-    // TODO:
+    editorInsertNewline();
     break;
 
   case CTRL_KEY('q'):
