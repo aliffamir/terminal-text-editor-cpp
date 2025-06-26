@@ -20,7 +20,7 @@
 /* forward declarations */
 void editorSetStatusMessage(std::string_view fmt, ...);
 void editorRefreshScreen();
-std::string editorPrompt(std::string&& prompt);
+std::string editorPrompt(std::string&& prompt, void (*callback)(std::string_view, int));
 
 enum EditorKey
 {
@@ -242,7 +242,7 @@ std::string replaceAll(char from, std::string_view to, std::string& str)
 
 int editorRowCxToRx(erow& row, int cursorX)
 {
-  int renderX = 0;
+  int renderX{0};
   for (int j{0}; j < cursorX && j < static_cast<int>(row.chars.size()); ++j)
   {
     if (row.chars[j] == '\t')
@@ -252,6 +252,25 @@ int editorRowCxToRx(erow& row, int cursorX)
     renderX++;
   }
   return renderX;
+}
+
+int editorRowRxToCx(erow& row, int renderX)
+{
+  int currentRx{0};
+  int cursorX;
+  for (cursorX = 0; cursorX < row.chars.length(); ++cursorX)
+  {
+    if (row.chars[cursorX] == '\t')
+    {
+      currentRx = (KILO_TAB_STOP - 1) - (currentRx % KILO_TAB_STOP);
+    }
+    currentRx++;
+
+    if (currentRx > cursorX)
+      return cursorX;
+  }
+
+  return cursorX;
 }
 
 void editorUpdateRow(erow& row)
@@ -425,8 +444,9 @@ void editorSave()
 {
   if (E.filename.empty())
   {
-    E.filename = editorPrompt("Save as: %s");
-    if (E.filename.empty()) {
+    E.filename = editorPrompt("Save as: %s", nullptr);
+    if (E.filename.empty())
+    {
       editorSetStatusMessage("Save aborted");
       return;
     }
@@ -448,6 +468,33 @@ void editorSave()
   }
 
   editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
+}
+
+/* find */
+void editorFindCallback(std::string_view query, int key)
+{
+  if (key == '\r' || key == '\x1b')
+  {
+    return;
+  }
+
+  for (int i{0}; i < E.numrows; ++i)
+  {
+    erow& row = E.row[i];
+    std::size_t match = row.render.find(query);
+    if (!(match == std::string::npos))
+    {
+      E.cursorY = i;
+      E.cursorX = editorRowRxToCx(row, match);
+      E.rowoffset = E.numrows;
+      break;
+    }
+  }
+}
+
+void editorFind()
+{
+  std::string query = editorPrompt("Search: %s (ESC to cancel)", editorFindCallback);
 }
 
 /* output */
@@ -617,7 +664,7 @@ void editorSetStatusMessage(std::string_view fmt, ...)
 
 /* input */
 
-std::string editorPrompt(std::string&& prompt)
+std::string editorPrompt(std::string&& prompt, void (*callback)(std::string_view, int))
 {
   std::string buf;
   while (true)
@@ -626,13 +673,20 @@ std::string editorPrompt(std::string&& prompt)
     editorRefreshScreen();
 
     int c = editorReadKey();
-    if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
-      if (!buf.empty()) {
+    if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE)
+    {
+      if (!buf.empty())
+      {
         buf.pop_back();
       }
     }
     else if (c == '\x1b')
     {
+      editorSetStatusMessage("");
+      if (callback)
+      {
+        callback(buf, c);
+      }
       return "";
     }
     // if enter key
@@ -642,12 +696,21 @@ std::string editorPrompt(std::string&& prompt)
       {
 
         editorSetStatusMessage("");
+        if (callback)
+        {
+          callback(buf, c);
+        }
         return buf;
       }
     }
     else if (!iscntrl(c) && c < 128)
     {
       buf += c;
+    }
+
+    if (callback)
+    {
+      callback(buf, c);
     }
   }
 }
@@ -742,6 +805,10 @@ void editorProcessKeypress()
     }
     break;
 
+  case CTRL_KEY('f'):
+    editorFind();
+    break;
+
   case BACKSPACE:
   case CTRL_KEY('h'):
   case DEL_KEY:
@@ -818,7 +885,7 @@ int main(int argc, char* argv[])
     editorOpen(argv[1]);
   }
 
-  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
+  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
 
   while (1)
   {
