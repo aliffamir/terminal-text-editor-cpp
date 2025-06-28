@@ -36,10 +36,17 @@ enum EditorKey
   PAGE_DOWN,
 };
 
+enum editorHighlight
+{
+  HL_NORMAL = 0,
+  HL_NUMBER,
+};
+
 struct erow
 {
   std::string chars;
   std::string render;
+  std::string highlight;
 };
 
 struct editorConfig
@@ -61,6 +68,7 @@ struct editorConfig
 
 editorConfig E;
 
+/* terminal */
 void die(const char* s)
 {
   perror(s);
@@ -219,7 +227,6 @@ int getWindowSize(int& rows, int& cols)
 }
 
 /* helpers */
-
 // replaces a char to a specified string in place, str is an INOUT param
 std::string replaceAll(char from, std::string_view to, std::string& str)
 {
@@ -236,6 +243,32 @@ std::string replaceAll(char from, std::string_view to, std::string& str)
     }
   }
   return newString;
+}
+
+/* syntax highlighting */
+
+void editorUpdateSyntax(erow& row)
+{
+  row.highlight.assign(row.render.size(), HL_NORMAL);
+
+  for (int i{0}; i < row.render.length(); ++i)
+  {
+    if (isdigit(row.render[i]))
+    {
+      row.highlight[i] = HL_NUMBER;
+    }
+  }
+}
+
+int editorSyntaxToColor(int hl)
+{
+  switch (hl)
+  {
+  case HL_NUMBER:
+    return 31;
+  default:
+    return 37;
+  }
 }
 
 /* row operations */
@@ -300,6 +333,7 @@ void editorUpdateRow(erow& row)
   }
 
   row.render = std::move(result);
+  editorUpdateSyntax(row);
 }
 
 void editorInsertRow(int at, std::string_view line)
@@ -581,18 +615,35 @@ void editorDrawRows(std::string& buffer)
         len = E.screencols;
       }
 
-      // get pointer to where current cursor is in render string
       char* c = E.row[filerow].render.data() + E.coloffset;
+      char* hl = E.row[filerow].highlight.data() + E.coloffset;
+
+      int currentColour{-1};
       for (int j{0}; j < len; ++j)
       {
-        if (isdigit(c[j])) {
-          buffer.append("\x1b[31m", 5);
+        if (hl[j] == HL_NORMAL)
+        {
+          if (currentColour != -1)
+          {
+            buffer.append("\x1b[39m", 5);
+            currentColour = -1;
+          }
           buffer.append(1, c[j]);
-          buffer.append("\x1b[39m", 5);
-        } else {
+        }
+        else
+        {
+          int colour = editorSyntaxToColor(hl[j]);
+          if (colour != currentColour)
+          {
+            currentColour = colour;
+            std::string colourByte = std::format("\x1b[{}m", colour);
+            buffer.append(colourByte);
+          }
           buffer.append(1, c[j]);
         }
       }
+      // reset colour back to white
+      buffer.append("\x1b[39m", 5);
     }
 
     buffer.append("\x1b[K", 3);
