@@ -494,7 +494,21 @@ void editorFindCallback(std::string_view query, int key)
 
 void editorFind()
 {
+  int prevCX = E.cursorX;
+  int prevCY = E.cursorY;
+  int prevColOff = E.coloffset;
+  int prevRowOff = E.rowoffset;
+
   std::string query = editorPrompt("Search: %s (ESC to cancel)", editorFindCallback);
+
+  // restore cursor position and offset
+  if (query.empty())
+  {
+    E.cursorX = prevCX;
+    E.cursorY = prevCY;
+    E.coloffset = prevColOff;
+    E.rowoffset = prevRowOff;
+  }
 }
 
 /* output */
@@ -561,11 +575,24 @@ void editorDrawRows(std::string& buffer)
       {
         len = 0;
       }
+
       if (len > E.screencols)
       {
         len = E.screencols;
       }
-      buffer.append(E.row[filerow].render.substr(E.coloffset, len), 0, len);
+
+      // get pointer to where current cursor is in render string
+      char* c = E.row[filerow].render.data() + E.coloffset;
+      for (int j{0}; j < len; ++j)
+      {
+        if (isdigit(c[j])) {
+          buffer.append("\x1b[31m", 5);
+          buffer.append(1, c[j]);
+          buffer.append("\x1b[39m", 5);
+        } else {
+          buffer.append(1, c[j]);
+        }
+      }
     }
 
     buffer.append("\x1b[K", 3);
