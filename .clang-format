@@ -1,4 +1,4 @@
 BasedOnStyle: Microsoft
 PointerAlignment: Left
 SpaceBeforeAssignmentOperators: True
-IndentWidth: 2
+IndentWidth: 4
