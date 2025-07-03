@@ -248,16 +248,34 @@ std::string replaceAll(char from, std::string_view to, std::string& str)
 
 /* syntax highlighting */
 
+bool isSeparator(int c)
+{
+    return isspace(c) || c == '\0' || std::string_view{",.()+-/*=~%<>[];"}.find(c) != std::string_view::npos;
+}
 void editorUpdateSyntax(erow& row)
 {
     row.highlight.assign(row.render.size(), HL_NORMAL);
 
-    for (int i{0}; i < row.render.length(); ++i)
+    // initialise to true because we consider the beginning of the line as a separator
+    // otherwise, numbers at the beginning of a line won't be highlighted
+    bool isPrevSeparator = true;
+
+    int i{0};
+    while (i < row.render.size())
     {
-        if (isdigit(row.render[i]))
+        char c = row.render[i];
+        unsigned char prevHighlight = (i > 0) ? row.highlight[i - 1] : HL_NORMAL;
+
+        if (isdigit(c) && (isPrevSeparator || prevHighlight == HL_NUMBER) || (c == '.' && prevHighlight == HL_NUMBER))
         {
             row.highlight[i] = HL_NUMBER;
+            i++;
+            isPrevSeparator = false;
+            continue;
         }
+
+        isPrevSeparator = isSeparator(c);
+        i++;
     }
 }
 
