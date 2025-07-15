@@ -89,7 +89,7 @@ constexpr std::array<EditorSyntax, 1> HLDB{{
     {"c", C_HL_extensions, HL_HIGHLIGHT_NUMBERS},
 }};
 
-constexpr int HLDB_ENTRIES {HLDB.size()};
+constexpr int HLDB_ENTRIES{HLDB.size()};
 
 /* terminal */
 void die(const char* s)
@@ -278,6 +278,9 @@ void editorUpdateSyntax(erow& row)
 {
     row.highlight.assign(row.render.size(), HL_NORMAL);
 
+    if (!E.syntax)
+        return;
+
     // initialise to true because we consider the beginning of the line as a separator
     // otherwise, numbers at the beginning of a line won't be highlighted
     bool isPrevSeparator = true;
@@ -288,12 +291,16 @@ void editorUpdateSyntax(erow& row)
         char c = row.render[i];
         unsigned char prevHighlight = (i > 0) ? row.highlight[i - 1] : HL_NORMAL;
 
-        if (isdigit(c) && (isPrevSeparator || prevHighlight == HL_NUMBER) || (c == '.' && prevHighlight == HL_NUMBER))
+        if (E.syntax->flags & HL_HIGHLIGHT_NUMBERS)
         {
-            row.highlight[i] = HL_NUMBER;
-            i++;
-            isPrevSeparator = false;
-            continue;
+            if (isdigit(c) && (isPrevSeparator || prevHighlight == HL_NUMBER) ||
+                (c == '.' && prevHighlight == HL_NUMBER))
+            {
+                row.highlight[i] = HL_NUMBER;
+                i++;
+                isPrevSeparator = false;
+                continue;
+            }
         }
 
         isPrevSeparator = isSeparator(c);
@@ -749,7 +756,8 @@ void editorDrawStatusBar(std::string& buffer)
                                      E.numrows, E.dirty ? "(modified)" : "");
     std::size_t len{status.length() > E.screencols ? E.screencols : status.length()};
 
-    std::string rStatus = std::format("{:s} | {:d}/{:d}", E.syntax ? E.syntax->filetype : "no ft" ,E.cursorY + 1, E.numrows);
+    std::string rStatus =
+        std::format("{:s} | {:d}/{:d}", E.syntax ? E.syntax->filetype : "no ft", E.cursorY + 1, E.numrows);
 
     buffer.append(status.c_str(), len);
 
