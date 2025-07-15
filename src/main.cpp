@@ -76,7 +76,7 @@ struct EditorConfig
     std::string filename;
     std::string statusmsg;
     std::time_t statusmsg_time;
-    EditorSyntax* syntax;
+    const EditorSyntax* syntax;
     termios original_termios;
 };
 EditorConfig E;
@@ -321,6 +321,37 @@ int editorSyntaxToColor(int hl)
     }
 }
 
+void editorSelectSyntaxHighlight()
+{
+    E.syntax = nullptr;
+    if (E.filename.empty())
+        return;
+
+    std::string_view fileExtension{};
+
+    int idx{static_cast<int>(E.filename.rfind('.'))};
+    if (idx != std::string::npos)
+    {
+        fileExtension = {E.filename.begin() + idx, E.filename.end()};
+    }
+
+    // Loop over each Language syntax
+    for (const EditorSyntax& syntax : HLDB)
+    {
+        // Loop over each file extension/type
+        for (const auto& fileType : syntax.filematch)
+        {
+            bool isExtension = syntax.filematch[0] == ".";
+            if ((isExtension && !(fileExtension.empty()) && fileExtension == fileType) ||
+                (!isExtension && (E.filename.find(fileType) != std::string_view::npos)))
+            {
+                E.syntax = &syntax;
+                return;
+            }
+        }
+    }
+}
+
 /* row operations */
 
 int editorRowCxToRx(erow& row, int cursorX)
@@ -504,6 +535,9 @@ std::string editorRowsToString()
 void editorOpen(char* filename)
 {
     E.filename = filename;
+
+    editorSelectSyntaxHighlight();
+
     std::ifstream infile;
     infile.open(filename);
     if (!infile.is_open())
@@ -534,6 +568,7 @@ void editorSave()
             editorSetStatusMessage("Save aborted");
             return;
         }
+        editorSelectSyntaxHighlight();
     }
 
     std::string fileContent = editorRowsToString();
