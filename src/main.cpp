@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <format>
 #include <fstream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <sys/ioctl.h>
@@ -43,6 +44,17 @@ enum editorHighlight
     HL_MATCH,
 };
 
+#define HL_HIGHLIGHT_NUMBERS (1 << 0)
+
+/* data */
+
+struct EditorSyntax
+{
+    std::string filetype;
+    std::span<const std::string_view> filematch;
+    int flags;
+};
+
 struct erow
 {
     std::string chars;
@@ -50,7 +62,7 @@ struct erow
     std::string highlight;
 };
 
-struct editorConfig
+struct EditorConfig
 {
     int cursorX, cursorY;
     int renderX;
@@ -66,8 +78,17 @@ struct editorConfig
     std::time_t statusmsg_time;
     termios original_termios;
 };
+EditorConfig E;
 
-editorConfig E;
+/* filetypes */
+
+constexpr std::array<std::string_view, 3> C_HL_extensions{".c", ".h", ".cpp"};
+
+constexpr std::array<EditorSyntax, 1> HLDB{{
+    {"c", C_HL_extensions, HL_HIGHLIGHT_NUMBERS},
+}};
+
+constexpr int HLDB_ENTRIES {HLDB.size()};
 
 /* terminal */
 void die(const char* s)
