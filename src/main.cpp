@@ -76,6 +76,7 @@ struct EditorConfig
     std::string filename;
     std::string statusmsg;
     std::time_t statusmsg_time;
+    EditorSyntax* syntax;
     termios original_termios;
 };
 EditorConfig E;
@@ -1035,6 +1036,7 @@ void initEditor()
     E.filename = "";
     E.statusmsg = "";
     E.statusmsg_time = 0;
+    E.syntax = nullptr;
 
     if (getWindowSize(E.screenrows, E.screencols) == -1)
         die("getWindowSize");
