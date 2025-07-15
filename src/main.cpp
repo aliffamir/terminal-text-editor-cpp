@@ -749,7 +749,7 @@ void editorDrawStatusBar(std::string& buffer)
                                      E.numrows, E.dirty ? "(modified)" : "");
     std::size_t len{status.length() > E.screencols ? E.screencols : status.length()};
 
-    std::string rStatus = std::format("{:d}/{:d}", E.cursorY + 1, E.numrows);
+    std::string rStatus = std::format("{:s} | {:d}/{:d}", E.syntax ? E.syntax->filetype : "no ft" ,E.cursorY + 1, E.numrows);
 
     buffer.append(status.c_str(), len);
 
