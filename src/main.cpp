@@ -329,7 +329,7 @@ void editorSelectSyntaxHighlight()
 
     std::string_view fileExtension{};
 
-    int idx{static_cast<int>(E.filename.rfind('.'))};
+    std::size_t idx{E.filename.rfind('.')};
     if (idx != std::string::npos)
     {
         fileExtension = {E.filename.begin() + idx, E.filename.end()};
