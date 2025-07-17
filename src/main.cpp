@@ -40,11 +40,13 @@ enum EditorKey
 enum editorHighlight
 {
     HL_NORMAL = 0,
+    HL_STRING,
     HL_NUMBER,
     HL_MATCH,
 };
 
 #define HL_HIGHLIGHT_NUMBERS (1 << 0)
+#define HL_HIGHLIGHT_STIRNGS (1 << 1)
 
 /* data */
 
@@ -86,7 +88,7 @@ EditorConfig E;
 constexpr std::array<std::string_view, 3> C_HL_extensions{".c", ".h", ".cpp"};
 
 constexpr std::array<EditorSyntax, 1> HLDB{{
-    {"c", C_HL_extensions, HL_HIGHLIGHT_NUMBERS},
+    {"c", C_HL_extensions, HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STIRNGS},
 }};
 
 constexpr int HLDB_ENTRIES{HLDB.size()};
@@ -284,12 +286,46 @@ void editorUpdateSyntax(erow& row)
     // initialise to true because we consider the beginning of the line as a separator
     // otherwise, numbers at the beginning of a line won't be highlighted
     bool isPrevSeparator = true;
+    int inString = 0;
 
     int i{0};
     while (i < row.render.size())
     {
         char c = row.render[i];
         unsigned char prevHighlight = (i > 0) ? row.highlight[i - 1] : HL_NORMAL;
+
+        if (E.syntax->flags & HL_HIGHLIGHT_STIRNGS)
+        {
+            if (inString)
+            {
+                row.highlight[i] = HL_STRING;
+
+                if (c == '\\' && i + 1 < row.render.length())
+                {
+                    row.highlight[i + 1] = HL_STRING;
+                    i += 2;
+                    continue;
+                }
+
+                if (c == inString)
+                {
+                    inString = 0;
+                }
+                i++;
+                isPrevSeparator = true;
+                continue;
+            }
+            else
+            {
+                if (c == '"' || c == '\'')
+                {
+                    inString = c;
+                    row.highlight[i] = HL_STRING;
+                    i++;
+                    continue;
+                }
+            }
+        }
 
         if (E.syntax->flags & HL_HIGHLIGHT_NUMBERS)
         {
@@ -312,6 +348,8 @@ int editorSyntaxToColor(int hl)
 {
     switch (hl)
     {
+    case HL_STRING:
+        return 35;
     case HL_NUMBER:
         return 31;
     case HL_MATCH:
@@ -346,8 +384,9 @@ void editorSelectSyntaxHighlight()
                 (!isExtension && (E.filename.find(fileType) != std::string_view::npos)))
             {
                 E.syntax = &syntax;
-                
-                for (auto& filerow : E.row) {
+
+                for (auto& filerow : E.row)
+                {
                     editorUpdateSyntax(filerow);
                 }
                 return;
