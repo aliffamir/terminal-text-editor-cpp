@@ -37,9 +37,10 @@ enum EditorKey
     PAGE_DOWN,
 };
 
-enum editorHighlight
+enum EditorHighlight
 {
     HL_NORMAL = 0,
+    HL_COMMENT,
     HL_STRING,
     HL_NUMBER,
     HL_MATCH,
@@ -54,6 +55,7 @@ struct EditorSyntax
 {
     std::string filetype;
     std::span<const std::string_view> filematch;
+    std::string singleLineCommentStart;
     int flags;
 };
 
@@ -88,7 +90,7 @@ EditorConfig E;
 constexpr std::array<std::string_view, 3> C_HL_extensions{".c", ".h", ".cpp"};
 
 constexpr std::array<EditorSyntax, 1> HLDB{{
-    {"c", C_HL_extensions, HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STIRNGS},
+    {"c", C_HL_extensions, "//", HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STIRNGS},
 }};
 
 constexpr int HLDB_ENTRIES{HLDB.size()};
@@ -283,6 +285,9 @@ void editorUpdateSyntax(erow& row)
     if (!E.syntax)
         return;
 
+    std::string_view scs = E.syntax->singleLineCommentStart;
+    bool isScs = scs.length();
+
     // initialise to true because we consider the beginning of the line as a separator
     // otherwise, numbers at the beginning of a line won't be highlighted
     bool isPrevSeparator = true;
@@ -293,6 +298,13 @@ void editorUpdateSyntax(erow& row)
     {
         char c = row.render[i];
         unsigned char prevHighlight = (i > 0) ? row.highlight[i - 1] : HL_NORMAL;
+
+        if (isScs && !inString) {
+            if(row.render.substr(i).starts_with(scs)) {
+                std::fill(row.highlight.begin() + i, row.highlight.end(), HL_COMMENT);
+                break;
+            }
+        }
 
         if (E.syntax->flags & HL_HIGHLIGHT_STIRNGS)
         {
@@ -348,6 +360,8 @@ int editorSyntaxToColor(int hl)
 {
     switch (hl)
     {
+    case HL_COMMENT:
+        return 36;
     case HL_STRING:
         return 35;
     case HL_NUMBER:
