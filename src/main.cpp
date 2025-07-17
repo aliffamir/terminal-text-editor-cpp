@@ -346,6 +346,10 @@ void editorSelectSyntaxHighlight()
                 (!isExtension && (E.filename.find(fileType) != std::string_view::npos)))
             {
                 E.syntax = &syntax;
+                
+                for (auto& filerow : E.row) {
+                    editorUpdateSyntax(filerow);
+                }
                 return;
             }
         }
@@ -422,7 +426,7 @@ void editorInsertRow(int at, std::string_view line)
     if (at < 0 || at > E.numrows)
         return;
 
-    E.row.emplace(E.row.begin() + at, erow{static_cast<std::string>(line), ""});
+    E.row.emplace(E.row.begin() + at, erow{static_cast<std::string>(line), "", ""});
     editorUpdateRow(E.row[at]);
     E.numrows++;
     E.dirty++;
