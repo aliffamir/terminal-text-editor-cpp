@@ -41,6 +41,8 @@ enum EditorHighlight
 {
     HL_NORMAL = 0,
     HL_COMMENT,
+    HL_KEYWORD1,
+    HL_KEYWORD2,
     HL_STRING,
     HL_NUMBER,
     HL_MATCH,
@@ -55,6 +57,7 @@ struct EditorSyntax
 {
     std::string filetype;
     std::span<const std::string_view> filematch;
+    std::span<const std::string_view> keywords;
     std::string singleLineCommentStart;
     int flags;
 };
@@ -88,9 +91,13 @@ EditorConfig E;
 /* filetypes */
 
 constexpr std::array<std::string_view, 3> C_HL_extensions{".c", ".h", ".cpp"};
+constexpr std::array<std::string_view, 23> C_HL_keywords{
+    "switch", "if",      "while",   "for",    "break",     "continue", "return", "else",
+    "struct", "union",   "typedef", "static", "enum",      "class",    "case",   "int|",
+    "long|",  "double|", "float|",  "char|",  "unsigned|", "signed|",  "void|"};
 
 constexpr std::array<EditorSyntax, 1> HLDB{{
-    {"c", C_HL_extensions, "//", HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STIRNGS},
+    {"c", C_HL_extensions, C_HL_keywords, "//", HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STIRNGS},
 }};
 
 constexpr int HLDB_ENTRIES{HLDB.size()};
@@ -299,8 +306,10 @@ void editorUpdateSyntax(erow& row)
         char c = row.render[i];
         unsigned char prevHighlight = (i > 0) ? row.highlight[i - 1] : HL_NORMAL;
 
-        if (isScs && !inString) {
-            if(row.render.substr(i).starts_with(scs)) {
+        if (isScs && !inString)
+        {
+            if (row.render.substr(i).starts_with(scs))
+            {
                 std::fill(row.highlight.begin() + i, row.highlight.end(), HL_COMMENT);
                 break;
             }
@@ -362,6 +371,10 @@ int editorSyntaxToColor(int hl)
     {
     case HL_COMMENT:
         return 36;
+    case HL_KEYWORD1:
+        return 33;
+    case HL_KEYWORD2:
+        return 32;
     case HL_STRING:
         return 35;
     case HL_NUMBER:
